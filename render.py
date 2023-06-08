@@ -21,33 +21,34 @@ class Render:
         isect = obj.intersect(ray_orig, ray_dir)
         if isect['intersect'] == False:
             return bg
+        
         num_samples = math.floor((isect['t1'] - isect['t0']) / self.step_size)
-        transparency = 1.
-
         if self.backward_raymarching:
             result = bg
+            sample_transparency = math.exp(-self.step_size * obj.absorption)
             for i in range(num_samples):
                 t = isect['t1'] - self.step_size * (i + 0.5)
-                sample_pos = ray_orig + t * ray_dir
-                
-                sample_transparency = math.exp(-self.step_size * obj.absorption)
+                sample_pos = ray_orig + t * ray_dir    
                 light_isect = obj.intersect(sample_pos, -1 * self.light_dir)
                 light_attenuation = math.exp(- light_isect['t1'] * obj.absorption)
                 result = result + self.light_color * obj.scattering * light_attenuation * self.step_size
                 result = result * sample_transparency
             return result
+
         else:
             transparency = 1.
             result = Vec3()
+            sample_transparency = math.exp(-self.step_size * obj.absorption)
             for i in range(num_samples):
                 t = isect['t0'] + self.step_size * (i + 0.5)
                 sample_pos = ray_orig + t * ray_dir
-                sample_transparency = math.exp(-self.step_size * obj.absorption)
                 transparency *= sample_transparency
                 light_isect = obj.intersect(sample_pos, -1 * self.light_dir)
                 light_attenuation = math.exp(- light_isect['t1'] * obj.absorption)
                 result = result + transparency * self.light_color * obj.scattering * light_attenuation * self.step_size
-
+                # Stop is we have negligible transparency left
+                if transparency < 0.001:
+                    break
             return bg * transparency + result
     
     def render(self, camera, obj, bg):
@@ -80,5 +81,5 @@ from objects import Sphere
 
 obj = Sphere(absorption=1., scattering=0.6)
 cam = Camera(980, 512, fov=60)
-ren = Render(step_size=0.02, backward_raymarching=True)
+ren = Render(step_size=0.05, backward_raymarching=False)
 ren.render(cam, obj, Vec3(0.7,0.7,0.7))
