@@ -1,6 +1,7 @@
 from vec3 import Vec3
-from helper import clip
+from helper import * 
 import math
+import random
 
 # For now we assume we have one object on the scenei
 class Camera:
@@ -25,32 +26,36 @@ class Render:
         num_samples = math.floor((isect['t1'] - isect['t0']) / self.step_size)
         if self.backward_raymarching:
             result = bg
-            sample_transparency = math.exp(-self.step_size * obj.absorption)
+            sample_transparency = math.exp(-self.step_size * (obj.scattering + obj.absorption))
             for i in range(num_samples):
-                t = isect['t1'] - self.step_size * (i + 0.5)
+                t = isect['t1'] - self.step_size * (i + random.random())
                 sample_pos = ray_orig + t * ray_dir    
                 light_isect = obj.intersect(sample_pos, -1 * self.light_dir)
-                light_attenuation = math.exp(- light_isect['t1'] * obj.absorption)
-                result = result + self.light_color * obj.scattering * light_attenuation * self.step_size
+                light_attenuation = math.exp(- light_isect['t1'] * (obj.scattering + obj.absorption))
+                result = result + self.light_color * light_attenuation *\
+                        obj.phase(sample_pos, -light_dir, -ray_dir) * obj.scattering *\
+                        self.step_size
                 result = result * sample_transparency
             return result
 
         else:
             transparency = 1.
             result = Vec3()
-            sample_transparency = math.exp(-self.step_size * obj.absorption)
+            sample_transparency = math.exp(-self.step_size * (obj.scattering + obj.absorption))
             for i in range(num_samples):
-                t = isect['t0'] + self.step_size * (i + 0.5)
+                t = isect['t0'] + self.step_size * (i + random.random())
                 sample_pos = ray_orig + t * ray_dir
                 transparency *= sample_transparency
                 light_isect = obj.intersect(sample_pos, -1 * self.light_dir)
-                light_attenuation = math.exp(- light_isect['t1'] * obj.absorption)
-                result = result + transparency * self.light_color * obj.scattering * light_attenuation * self.step_size
+                light_attenuation = math.exp(- light_isect['t1'] * (obj.scattering + obj.absorption))
+                result = result + transparency * self.light_color * light_attenuation *\
+                        obj.scattering * obj.phase(sample_pos, -light_dir, -ray_dir) *\
+                        self.step_size
                 # Stop is we have negligible transparency left
                 if transparency < 0.001:
                     break
             return bg * transparency + result
-    
+
     def render(self, camera, obj, bg):
         # Generate rays
         aspectRatio = camera.W / camera.H
@@ -78,8 +83,18 @@ class Render:
 
 
 from objects import Sphere
-
-obj = Sphere(absorption=1., scattering=0.6)
-cam = Camera(980, 512, fov=60)
-ren = Render(step_size=0.05, backward_raymarching=False)
-ren.render(cam, obj, Vec3(0.7,0.7,0.7))
+#Light direction
+light_dir = Vec3(0., -1., 0.)
+# Light color
+light_color = 14 * Vec3(1.3, 0.3, 0.9)
+# Phase function
+p = identity_phase_fn()
+p = uniform_phase_fn()
+p = greenstein_phase_fn(g=.0)
+# Object
+obj = Sphere(absorption=.3, scattering=0.5, phase=p)
+# Camera
+cam = Camera(980, 512, fov=60, position=Vec3(0, 0, 4))
+# Renderer
+ren = Render(step_size=0.05, light_dir=light_dir, light_color=light_color, backward_raymarching=False)
+ren.render(cam, obj, bg=Vec3(0.7,0.7,0.7))

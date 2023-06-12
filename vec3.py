@@ -30,6 +30,9 @@ class Vec3:
     def __sub__(self, other):
         return Vec3(self.x-other.x, self.y-other.y, self.z-other.z)
 
+    def __neg__(self):
+        return -1. * self
+    
     def __mul__(self, other):
         if isinstance(other, Vec3):
             return Vec3(self.x*other.x, self.y*other.y, self.z*other.z)
